@@ -85,23 +85,23 @@ def process_data():
 # Calculates the strength of a given scheduling arrangment
 #    based on how well it satisfies each student's preferences
 # NOTE: assumes student has been assigned a top-five preferred class
-def utility(preferences, student_assignments):
+def utility():
     u = 0
-    for student,class in student_assignments.items():
-        u += preferences[student].index(class)
+    for s,c in student_assignments.items():
+        u += preferences[s].index(c)
     return u
 
 # There are three steps in the assignment process:
 # 1) Assign each student their top choice
 # 2) Balance class age distributions
 # 3) Fix outstanding class size issues
-# Fixes will be made MAXIMIZE overall utility and GUARANTEE upperclassmen
+# Fixes will be made MAXIMIZE overall utility and GUARANTEE upperclassmen priority
 
 # assign top Choice
 # classes that don't have issues --> REMOVE!
 # each class that has an issue --> FIX
 #   find out if we can jill two birds with one stone
-def assign(preferences):
+def assign():
     # Step 1
     student_assignments = [val[0] for key,val in preferences.items()]
     class_assignments = make_class_assignments()
@@ -109,22 +109,43 @@ def assign(preferences):
     # Step 2
     # find classes that have too many or too few
     # collect those students who don't fit
-    for class, students in class_assignments.items():
-        if len(class) > MAX_CLASS_SIZE or len(class) < MIN_CLASS_SIZE:
-
-
-    return class_assignments
-
+    # for class, students in class_assignments.items():
+    #     if len(class) > MAX_CLASS_SIZE or len(class) < MIN_CLASS_SIZE:
 
 # Quick conversion from the student assignments structure
 def make_class_assignments():
     class_assignments = {}
-    for class in CLASSES:
-        class_assignments[class] = [val for key,val in student_assignments.items() if key == class]
+    for c in CLASSES:
+        class_assignments[c] = [val for key,val in student_assignments.items() if key == c]
     return class_assignments
 
 def check_valid_class():
     pass
 
+def debug_print_vars():
+    print("CLASSES")
+    print(CLASSES)
+    print("\n\n")
+
+    print("FORMS")
+    print(FORMS)
+    print("\n\n")
+
+    print("PREFERENCES")
+    print(preferences)
+    print("\n\n")
+
+    print("STUDENT ASSIGNMENTS")
+    print(student_assignments)
+    print("\n\n")
+
+    print("CLASS ASSIGNMENTS")
+    print(class_assignments)
+    print("\n\n")
+
 def main():
     process_data()
+    assign()
+    debug_print_vars()
+
+main()
