@@ -1,30 +1,19 @@
 import pandas as pd
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
+from Student import Student
+from Course import Course
 
+# Consts
 MAX_CLASS_SIZE = 16
 MIN_CLASS_SIZE = 6
 NUM_COURSES = 40
 
-# List of all available classes
-# EXAMPLE: CLASSES = ["class1", "class2", ...]
+# List of all available classes as Course objects
 CLASSES = []
 
-# List of student in each form
-# EXAMPLE {3: ["johndoe1@pingry.org", ...], 4: ...}
-FORMS = {"3":[], "4":[], "5":[], "6":[]}
-
-# Store the preferences of each student in a dictionary
-# Ordered array containing preferences from 1-5
-# EXAMPLE: preferences: ["student3": ["class4", "class2", "class3", "class1", "class6"], ...]
-preferences = {}
-
-# NOTE: Yes, class_assignments and student_assignments hold the same information, just in different ways.
-# class_assignments: ["class1": ["student2", "student5", ...], ...]
-class_assignments = {}
-
-# student_assignments: ["student1":"class5", ...]
-student_assignments = {}
+# List of all students that signed up on Google Sheets as Student objects
+STUDENTS = []
 
 def get_sheet_data():
     # Use OAUTH2 and Google API client to authorize the application with gspread
@@ -44,15 +33,15 @@ def process_data():
 
     # Get the course names from the spreadsheet
     # Course names are stored in the first row of the spreadsheet with the format:
-    #       Select Your Courses! [Course Name Here]
-    for x in range(0, len(data[0])):
+    # Select Your Courses! [Course Name Here]
+    for cell in data[0]:
         # If the first word of the cell is "Select", it's a course
-        if (data[0][x][0:6] == "Select"):
+        if (cell[0:6] == "Select"):
             # Remove the surrounding parts of the course name
-            className = data[0][x][22:len(data[0][x]) - 1]
+            className = cell[22:len(cell) - 1]
 
             # Add class name to array
-            CLASSES.append(className)
+            CLASSES.append(Course(className, []))
 
     # Iterate over the rows of sheet data
     # For each student, do two things:
@@ -60,6 +49,7 @@ def process_data():
     # 2) Put their form into the static FORMS data
     skipFirst = True
 
+    # Loop through each registered user
     for row in data:
         # Skip the first row containing the titles
         if skipFirst:
@@ -67,7 +57,7 @@ def process_data():
             continue
 
         # Find the preferred courses by getting the index of their choices
-        # Then, get the course names through the CLASSES array
+        # Then, get the course objects through the CLASSES array
         # Classes are ordered in the array the same way they are ordered in the data row
         coursePrefs = []
         coursePrefs.append(CLASSES[row.index("First Choice") - 1])
@@ -76,19 +66,26 @@ def process_data():
         coursePrefs.append(CLASSES[row.index("Fourth Choice") - 1])
         coursePrefs.append(CLASSES[row.index("Fifth Choice") - 1])
 
-        # Add the course preferences to the preferences
-        preferences[row[len(row) - 2]] = coursePrefs
+        # Store the users first choice
+        firstChoice = CLASSES[row.index("First Choice") - 1]
 
-        # Add the student's email to the forms
-        FORMS[row[len(row) - 1]].append(row[len(row) - 2])
+        # Get the user's name, email, and form from the data
+        name = row[len(row) - 3]
+        form = row[len(row) - 1]
+        email = row[len(row) - 2]
+
+        # Create a new Student class object and add to list of students
+        # STUDENTS ARE INTIAILIZED WITH THEIR FIRST CHOICE AS THEIR COURSE
+        s = Student(coursePrefs, firstChoice, name, email, form)
+        STUDENTS.append(s)
 
 # Calculates the strength of a given scheduling arrangment
 #    based on how well it satisfies each student's preferences
 # NOTE: assumes student has been assigned a top-five preferred class
 def utility():
     u = 0
-    for s,c in student_assignments.items():
-        u += preferences[s].index(c)
+    for s in STUDENTS:
+        u += s.utility()
     return u
 
 # There are three steps in the assignment process:
@@ -102,9 +99,16 @@ def utility():
 # each class that has an issue --> FIX
 #   find out if we can jill two birds with one stone
 def assign():
+    bad_courses = [c for c in COURSES if !c.isValid()]
+    for i in range(len(bad_courses)):
+        for j in range(len(bad_course)):
+            if i != j:
+
+
     # Step 1
-    student_assignments = [val[0] for key,val in preferences.items()]
-    class_assignments = make_class_assignments()
+    #student_assignments = [val[0] for key,val in preferences.items()]
+    #class_assignments = make_class_assignments()
+
 
     # Step 2
     # find classes that have too many or too few
@@ -112,19 +116,19 @@ def assign():
     # for class, students in class_assignments.items():
     #     if len(class) > MAX_CLASS_SIZE or len(class) < MIN_CLASS_SIZE:
 
-# Quick conversion from the student assignments structure
-def make_class_assignments():
-    class_assignments = {}
-    for c in CLASSES:
-        class_assignments[c] = [val for key,val in student_assignments.items() if key == c]
-    return class_assignments
-
-def check_valid_class():
-    pass
 
 def debug_print_vars():
     print("CLASSES")
-    print(CLASSES)
+    for x in CLASSES:
+        print(x.name + ": ", end='')
+        for student in x.students:
+            print(student, end=", ")
+    print("\n\n")
+
+    print ("STUDENTS")
+    for y in STUDENTS:
+        print(y.name + ", " + y.course.name + ", " + y.email)
+
     print("\n\n")
 
     print("FORMS")
