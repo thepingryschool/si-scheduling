@@ -100,9 +100,9 @@ def utility():
 #   find out if we can jill two birds with one stone
 def assign():
     bad_courses = [c for c in COURSES if !c.isValid()]
-    for i in range(len(bad_courses)):
+    for x in bad_courses:
         for j in range(len(bad_course)):
-            if i != j:
+
 
 
     # Step 1

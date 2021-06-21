@@ -7,5 +7,7 @@ class Student:
         self.email = e
         self.form = f
 
+    # Calculates the utility of a student
+    # Higher utility means that the index 
     def utility():
-        return p.index(c)
+        return 6 - p.index(c)
