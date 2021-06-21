@@ -1,4 +1,4 @@
-# import pandas as pd
+import pandas as pd
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
@@ -19,15 +19,22 @@ FORMS = {"3":[], "4":[], "5":[], "6":[]}
 # EXAMPLE: preferences: ["student3": ["class4", "class2", "class3", "class1", "class6"], ...]
 preferences = {}
 
-# class_assignments: ["class1": ["student2", "student5", ...], ...]
-# student_assignments: ["student1":"class5", ...]
 # NOTE: Yes, class_assignments and student_assignments hold the same information, just in different ways.
+# class_assignments: ["class1": ["student2", "student5", ...], ...]
+class_assignments = {}
+
+# student_assignments: ["student1":"class5", ...]
+student_assignments = {}
 
 def get_sheet_data():
+    # Use OAUTH2 and Google API client to authorize the application with gspread
+    # gspread is a pip library for interacting with the google sheets API
+    # Learn more about the Google API client here: https://developers.google.com/sheets/api
     scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
     creds = ServiceAccountCredentials.from_json_keyfile_name('client_secret.json', scope)
     client = gspread.authorize(creds)
 
+    # Open the sheet and read data using gspread library
     sheet = client.open("Spring Intensive Signup (Responses)").sheet1
     return sheet.get_all_values()
 
@@ -84,20 +91,21 @@ def utility(preferences, student_assignments):
         u += preferences[student].index(class)
     return u
 
-# There are three steps:
+# There are three steps in the assignment process:
 # 1) Assign each student their top choice
 # 2) Balance class age distributions
 # 3) Fix outstanding class size issues
-# Fixes will be made according to UTILITY MAXIMIZATION and UPPERCLASSMEN PRIORITY
+# Fixes will be made MAXIMIZE overall utility and GUARANTEE upperclassmen
 
 # assign top Choice
 # classes that don't have issues --> REMOVE!
 # each class that has an issue --> FIX
-#
+#   find out if we can jill two birds with one stone
 def assign(preferences):
     # Step 1
     student_assignments = [val[0] for key,val in preferences.items()]
-    class_assignments = make_class_assignments(student_assignments)
+    class_assignments = make_class_assignments()
+
     # Step 2
     # find classes that have too many or too few
     # collect those students who don't fit
@@ -109,10 +117,14 @@ def assign(preferences):
 
 
 # Quick conversion from the student assignments structure
-def make_class_assignments(student_assignments):
+def make_class_assignments():
     class_assignments = {}
-    for class in classes:
+    for class in CLASSES:
         class_assignments[class] = [val for key,val in student_assignments.items() if key == class]
     return class_assignments
 
-process_data()
+def check_valid_class():
+    pass
+
+def main():
+    process_data()
