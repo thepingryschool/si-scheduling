@@ -15,17 +15,21 @@ CLASSES = []
 # List of all students that signed up on Google Sheets as Student objects
 STUDENTS = []
 
+
 def get_sheet_data():
     # Use OAUTH2 and Google API client to authorize the application with gspread
     # gspread is a pip library for interacting with the google sheets API
     # Learn more about the Google API client here: https://developers.google.com/sheets/api
-    scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-    creds = ServiceAccountCredentials.from_json_keyfile_name('client_secret.json', scope)
+    scope = ['https://spreadsheets.google.com/feeds',
+             'https://www.googleapis.com/auth/drive']
+    creds = ServiceAccountCredentials.from_json_keyfile_name(
+        'client_secret.json', scope)
     client = gspread.authorize(creds)
 
     # Open the sheet and read data using gspread library
     sheet = client.open("Spring Intensive Signup (Responses)").sheet1
     return sheet.get_all_values()
+
 
 def process_data():
     # Get the data from the API
@@ -82,6 +86,8 @@ def process_data():
 # Calculates the strength of a given scheduling arrangment
 #    based on how well it satisfies each student's preferences
 # NOTE: assumes student has been assigned a top-five preferred class
+
+
 def utility():
     u = 0
     for s in STUDENTS:
@@ -98,23 +104,22 @@ def utility():
 # classes that don't have issues --> REMOVE!
 # each class that has an issue --> FIX
 #   find out if we can jill two birds with one stone
+
+
 def assign():
     bad_courses = [c for c in COURSES if !c.isValid()]
     for x in bad_courses:
         for j in range(len(bad_course)):
 
+            # Step 1
+            #student_assignments = [val[0] for key,val in preferences.items()]
+            #class_assignments = make_class_assignments()
 
-
-    # Step 1
-    #student_assignments = [val[0] for key,val in preferences.items()]
-    #class_assignments = make_class_assignments()
-
-
-    # Step 2
-    # find classes that have too many or too few
-    # collect those students who don't fit
-    # for class, students in class_assignments.items():
-    #     if len(class) > MAX_CLASS_SIZE or len(class) < MIN_CLASS_SIZE:
+            # Step 2
+            # find classes that have too many or too few
+            # collect those students who don't fit
+            # for class, students in class_assignments.items():
+            #     if len(class) > MAX_CLASS_SIZE or len(class) < MIN_CLASS_SIZE:
 
 
 def debug_print_vars():
@@ -125,7 +130,7 @@ def debug_print_vars():
             print(student, end=", ")
     print("\n\n")
 
-    print ("STUDENTS")
+    print("STUDENTS")
     for y in STUDENTS:
         print(y.name + ", " + y.course.name + ", " + y.email)
 
@@ -147,9 +152,11 @@ def debug_print_vars():
     print(class_assignments)
     print("\n\n")
 
+
 def main():
     process_data()
     assign()
     debug_print_vars()
+
 
 main()

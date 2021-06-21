@@ -8,6 +8,6 @@ class Student:
         self.form = f
 
     # Calculates the utility of a student
-    # Higher utility means that the index 
+    # Higher utility means that the index
     def utility():
         return 6 - p.index(c)
