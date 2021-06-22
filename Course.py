@@ -3,6 +3,8 @@ MAX_CLASS_SIZE = 16
 MIN_CLASS_SIZE = 6
 NUM_COURSES = 40
 
+# MAKE A SATISTFACTION SCORE
+
 class Course:
     # Fields
     def __init__(self, n, s):
@@ -43,9 +45,11 @@ class Course:
         a = [0, 0, 0]
 
         for x in self.students:
-            if x.form == 3:
-                a[0]++
-            elif x.form == 4:
-                a[1]++
+            if x.form == "3":
+                a[0] += 1
+            elif x.form == "4":
+                a[1] += 1
             else:
-                a[2]++
+                a[2] += 1
+
+        return a

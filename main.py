@@ -1,10 +1,12 @@
 import pandas as pd
 import gspread
+import random
 from operator import attrgetter
 from oauth2client.service_account import ServiceAccountCredentials
 from Student import Student
-from Course import Course
+from Course import Course, MAX_CLASS_SIZE
 
+STUDENTS_PER_FORM = 2
 
 # List of all available classes as Course objects
 CLASSES = []
@@ -105,12 +107,16 @@ def assign():
     bad_courses = [c for c in CLASSES if not c.isValid()]
 
     # Sort problematic courses based on size
-    bad_courses.sort(key=lambda x : len(x.students))
+    bad_courses.sort(key=lambda x: len(x.students))
 
-    # for x in bad_courses:
-    #     print(x.name + ": " + str(x.size())
+    print("BEFORE")
+    for x in bad_courses:
+        print(x.name + ": " + str(x.size()) + " --> ", end="")
+        print(x.distribution())
+    print()
 
     for course in bad_courses:
+        print(course.name + "NAME")
         # Sort students based on their form (ascending)
         sortedStudents = sorted(course.students, key=attrgetter('form'))
 
@@ -120,34 +126,66 @@ def assign():
 
         # Calculate the disparity for the current course
         disparity = course.disparity()
-        dist = course.distribution() # --> for example, [3,3,3] means 3 frosh, 3 soph, 3 junior
+        # --> for example, [3,3,3] means 3 frosh, 3 soph, 3 junior
+        dist = course.distribution()
 
-        while abs(disparity) > 0 and min(dist) > 1:
-            # Surplus in the class
-            if disparity > 0:
+        while abs(disparity) > 0 or min(dist) < 2:
+            print("dist" + str(dist))
+            print(disparity)
+
+            # Distribution is good, but we have a surplus. So put a young student in a small class.
+            if min(dist) > 1 and disparity > 0:
                 # pushing out the youngest student to the smallest bad class
-                move_student(sortedStudents[0], bad_courses[0])
+                for s in sortedStudents:
+                    # just checking that we don't mess up our distribution by moving this student
+                    if dist[int(s.form) - 3] > 2:
+                        find = False
 
-            # Shortage in the class
-            elif disparity < 0:
-                # pulling the youngest student from the biggest class
-                topSorted = sorted(bad_courses[-1].students, key=attrgetter('form'))
-                move_student(topSorted[0], course)
+                        for p in s.preferences:
+                            if p.size() + 1 < MAX_CLASS_SIZE:
+                                find = True
+                                move_student(s, p)
+                                break
+                    if find:
+                        break
 
-            if min(dist) < 2
+            # Distribution is incorrect (implying a shortage), so we need to take a form-specific student
+            elif min(dist) < 2:
+                # Figure out what form needs fixing
+                gradeIndex = dist.index(min(dist))
+
+                find = False
+
+                for c in CLASSES:
+                    if c is not course and c.distribution()[gradeIndex] > 2:
+                        # Find student in biggest class with appropriate form and take them
+                        for student in c.students:
+                            if student.form == str(gradeIndex + 3) and course in student.preferences:
+                                move_student(student, course)
+                                find = True
+                                break
+                        if find:
+                            break
 
             # Re-sort courses and students
-            bad_courses.sort(key=lambda x : len(x.students))
+            # bad_courses.sort(key=lambda x : len(x.students))
             sortedStudents = sorted(course.students, key=attrgetter('form'))
 
-            # Re-calculate disparity
+            # Re-calculate disparity and distribution
             disparity = course.disparity()
+            dist = course.distribution()
 
+    print("AFTER")
     for x in CLASSES:
-        print(x.name + ": " + str(x.size()))
+        print(x.name + ": " + str(x.size()) + "")
+        for s in x.students:
+            print(s.name + " (" + s.form + ")")
+
+        print('\n')
 
 # Simple utility method, moves a student from one course to another
 # NOTE: assumes that the student is already enrolled in old_class
+
 
 def move_student(student, new_class):
     print("old", student.course.name)
@@ -155,7 +193,8 @@ def move_student(student, new_class):
     old_class.students.remove(student)
     new_class.students.append(student)
     student.course = new_class
-    print("new",student.course.name)
+    print("new", student.course.name)
+    # print()
 
 # Debugging method, shows Classes and Students
 
