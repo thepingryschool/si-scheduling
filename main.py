@@ -1,13 +1,10 @@
 import pandas as pd
 import gspread
+from operator import attrgetter
 from oauth2client.service_account import ServiceAccountCredentials
 from Student import Student
 from Course import Course
 
-# Consts
-MAX_CLASS_SIZE = 16
-MIN_CLASS_SIZE = 6
-NUM_COURSES = 40
 
 # List of all available classes as Course objects
 CLASSES = []
@@ -80,11 +77,13 @@ def process_data():
         # STUDENTS ARE INTIAILIZED WITH THEIR FIRST CHOICE AS THEIR COURSE
         s = Student(coursePrefs, firstChoice, name, email, form)
         STUDENTS.append(s)
+        firstChoice.students.append(s)
 
 # Calculates the strength of a given scheduling arrangment
 #    based on how well it satisfies each student's preferences
 # NOTE: assumes student has been assigned a top-five preferred class
 # I dont htink we need this
+
 
 def utility():
     u = 0
@@ -93,7 +92,7 @@ def utility():
     return u
 
 # There are three steps in the assignment process:
-# 1) Assign each student their top choice (intiailized)
+# 1) Assign each student their top choice (initialized)
 # 2) Determine which classes are problematic and which aren't
 #       - Only working with the problem classes from now on
 # 3) Iterate through classes --> move random (starting with underclassmen)
@@ -102,19 +101,63 @@ def utility():
 
 
 def assign():
-    # Step 2
-    bad_courses = [c for c in COURSES if not c.isValid()]
+    # Find the courses with problems
+    bad_courses = [c for c in CLASSES if not c.isValid()]
 
-    # Step 3
-    for x in bad_courses:
-        pass
+    # Sort problematic courses based on size
+    bad_courses.sort(key=lambda x : len(x.students))
+
+    # for x in bad_courses:
+    #     print(x.name + ": " + str(x.size())
+
+    for course in bad_courses:
+        # Sort students based on their form (ascending)
+        sortedStudents = sorted(course.students, key=attrgetter('form'))
+
+        # Disparity is positive when surplus, negative when shortage
+        #   if surplus (disparity positive) --> remove a student
+        #   if shortage (disparity negative) --> add a student
+
+        # Calculate the disparity for the current course
+        disparity = course.disparity()
+        dist = course.distribution() # --> for example, [3,3,3] means 3 frosh, 3 soph, 3 junior
+
+        while abs(disparity) > 0 and min(dist) > 1:
+            # Surplus in the class
+            if disparity > 0:
+                # pushing out the youngest student to the smallest bad class
+                move_student(sortedStudents[0], bad_courses[0])
+
+            # Shortage in the class
+            elif disparity < 0:
+                # pulling the youngest student from the biggest class
+                topSorted = sorted(bad_courses[-1].students, key=attrgetter('form'))
+                move_student(topSorted[0], course)
+
+            if min(dist) < 2
+
+            # Re-sort courses and students
+            bad_courses.sort(key=lambda x : len(x.students))
+            sortedStudents = sorted(course.students, key=attrgetter('form'))
+
+            # Re-calculate disparity
+            disparity = course.disparity()
+
+    for x in CLASSES:
+        print(x.name + ": " + str(x.size()))
 
 # Simple utility method, moves a student from one course to another
 # NOTE: assumes that the student is already enrolled in old_class
-def move_student(old_class, new_class, student):
+
+def move_student(student, new_class):
+    print("old", student.course.name)
+    old_class = student.course
     old_class.students.remove(student)
     new_class.students.append(student)
     student.course = new_class
+    print("new",student.course.name)
+
+# Debugging method, shows Classes and Students
 
 
 def debug_print_vars():
@@ -135,8 +178,8 @@ def debug_print_vars():
 
 def main():
     process_data()
-    # assign()
-    debug_print_vars()
+    # debug_print_vars()
+    assign()
 
 
 main()
