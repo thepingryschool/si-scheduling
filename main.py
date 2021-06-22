@@ -48,9 +48,7 @@ def process_data():
             CLASSES.append(Course(className, []))
 
     # Iterate over the rows of sheet data
-    # For each student, do two things:
-    # 1) Create an entry in preferences with their course selections
-    # 2) Put their form into the static FORMS data
+    # For each student, create a Student object with the appropriate fields
     skipFirst = True
 
     # Loop through each registered user
@@ -86,7 +84,7 @@ def process_data():
 # Calculates the strength of a given scheduling arrangment
 #    based on how well it satisfies each student's preferences
 # NOTE: assumes student has been assigned a top-five preferred class
-
+# I dont htink we need this
 
 def utility():
     u = 0
@@ -95,31 +93,28 @@ def utility():
     return u
 
 # There are three steps in the assignment process:
-# 1) Assign each student their top choice
-# 2) Balance class age distributions
-# 3) Fix outstanding class size issues
-# Fixes will be made MAXIMIZE overall utility and GUARANTEE upperclassmen priority
-
-# assign top Choice
-# classes that don't have issues --> REMOVE!
-# each class that has an issue --> FIX
-#   find out if we can jill two birds with one stone
+# 1) Assign each student their top choice (intiailized)
+# 2) Determine which classes are problematic and which aren't
+#       - Only working with the problem classes from now on
+# 3) Iterate through classes --> move random (starting with underclassmen)
+#        to their second choice class.
+# 4) Check whether all issues are resolved, and if not, keep looping
 
 
 def assign():
-    bad_courses = [c for c in COURSES if !c.isValid()]
+    # Step 2
+    bad_courses = [c for c in COURSES if not c.isValid()]
+
+    # Step 3
     for x in bad_courses:
-        for j in range(len(bad_course)):
+        pass
 
-            # Step 1
-            #student_assignments = [val[0] for key,val in preferences.items()]
-            #class_assignments = make_class_assignments()
-
-            # Step 2
-            # find classes that have too many or too few
-            # collect those students who don't fit
-            # for class, students in class_assignments.items():
-            #     if len(class) > MAX_CLASS_SIZE or len(class) < MIN_CLASS_SIZE:
+# Simple utility method, moves a student from one course to another
+# NOTE: assumes that the student is already enrolled in old_class
+def move_student(old_class, new_class, student):
+    old_class.students.remove(student)
+    new_class.students.append(student)
+    student.course = new_class
 
 
 def debug_print_vars():
@@ -128,6 +123,7 @@ def debug_print_vars():
         print(x.name + ": ", end='')
         for student in x.students:
             print(student, end=", ")
+        print()
     print("\n\n")
 
     print("STUDENTS")
@@ -136,26 +132,10 @@ def debug_print_vars():
 
     print("\n\n")
 
-    print("FORMS")
-    print(FORMS)
-    print("\n\n")
-
-    print("PREFERENCES")
-    print(preferences)
-    print("\n\n")
-
-    print("STUDENT ASSIGNMENTS")
-    print(student_assignments)
-    print("\n\n")
-
-    print("CLASS ASSIGNMENTS")
-    print(class_assignments)
-    print("\n\n")
-
 
 def main():
     process_data()
-    assign()
+    # assign()
     debug_print_vars()
 
 
