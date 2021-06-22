@@ -22,9 +22,9 @@ class Course:
         return counts
 
     def isValid(self):
-        # for key, val in self.age_distribution().items():
-        #     if val < 4:
-        #         return False
+        for key, val in self.age_distribution().items():
+            if val <= 2:
+                return False
         if self.size() < 6 or self.size() > 16:
             return False
         return True
@@ -34,12 +34,16 @@ class Course:
         # size and the current class size
 
         # If the class is too big, disparity is positive
-        if self.size() >= MAX_CLASS_SIZE:
+        if self.size() > MAX_CLASS_SIZE:
             return self.size() - MAX_CLASS_SIZE
 
         # If the class is too small, disparity is negative
-        else:
+        elif self.size() < MIN_CLASS_SIZE:
             return self.size() - MIN_CLASS_SIZE
+
+        # If the class is within the good bounds, disparity is 0
+        else:
+            return 0
 
     def distribution(self):
         a = [0, 0, 0]

@@ -81,18 +81,6 @@ def process_data():
         STUDENTS.append(s)
         firstChoice.students.append(s)
 
-# Calculates the strength of a given scheduling arrangment
-#    based on how well it satisfies each student's preferences
-# NOTE: assumes student has been assigned a top-five preferred class
-# I dont htink we need this
-
-
-def utility():
-    u = 0
-    for s in STUDENTS:
-        u += s.utility()
-    return u
-
 # There are three steps in the assignment process:
 # 1) Assign each student their top choice (initialized)
 # 2) Determine which classes are problematic and which aren't
@@ -117,61 +105,87 @@ def assign():
 
     for course in bad_courses:
         print(course.name + "NAME")
+
         # Sort students based on their form (ascending)
+        # Sorting guarantees that later down the line, moving students around
+        # begins with underclassmen, therefore ensuring upperclassmen priority
         sortedStudents = sorted(course.students, key=attrgetter('form'))
 
         # Disparity is positive when surplus, negative when shortage
-        #   if surplus (disparity positive) --> remove a student
-        #   if shortage (disparity negative) --> add a student
+        #       if surplus (disparity positive) --> remove a student
+        #       if shortage (disparity negative) --> add a student
+        # See definition in Course.py for more info.
 
         # Calculate the disparity for the current course
         disparity = course.disparity()
-        # --> for example, [3,3,3] means 3 frosh, 3 soph, 3 junior
+
+        # Calculate the distributino for the current course
+        # e.g. [3,3,3] means 3 frosh, 3 soph, 3 junior
         dist = course.distribution()
 
+        # Keep looping until the current course's problems are resolved
         while abs(disparity) > 0 or min(dist) < 2:
             print("dist" + str(dist))
             print(disparity)
 
-            # Distribution is good, but we have a surplus. So put a young student in a small class.
+            # Distribution is good, but we have a surplus.
+            # So, put a young student in a class they prefer.
             if min(dist) > 1 and disparity > 0:
-                # pushing out the youngest student to the smallest bad class
+                # Check all students in the problem class, *starting with youngest*
                 for s in sortedStudents:
-                    # just checking that we don't mess up our distribution by moving this student
+                    # Ensure distribution remains valid (convert form to index)
                     if dist[int(s.form) - 3] > 2:
-                        find = False
+                        # Find one of the user's preferences that has room for
+                        # the new student. If no preferences have room, continue
+                        # to the next youngest student in the problem course
+                        valid_pref_index = -1
 
-                        for p in s.preferences:
-                            if p.size() + 1 < MAX_CLASS_SIZE:
-                                find = True
-                                move_student(s, p)
+                        for i, pref in enumerate(s.preferences):
+                            if pref.size() + 1 < MAX_CLASS_SIZE:
+                                valid_pref_index = i
                                 break
-                    if find:
-                        break
 
-            # Distribution is incorrect (implying a shortage), so we need to take a form-specific student
+                        if valid_pref_index != -1:
+                            move_student(s, s.preferences[valid_pref_index])
+                            break
+
+            # Distribution is incorrect (implying a shortage), so we need to
+            # take a form-specific student from another class, remedying the
+            # disparity and distribution problems at the same time.
             elif min(dist) < 2:
-                # Figure out what form needs fixing
+                print("changing bottom")
+                # Figure out which form needs fixing in the class
                 gradeIndex = dist.index(min(dist))
 
                 find = False
 
+                # Loop through all available classes
                 for c in CLASSES:
+                    # Ignore the current problem course and ensure that giving a
+                    # student will not disrupt the distribution
                     if c is not course and c.distribution()[gradeIndex] > 2:
-                        # Find student in biggest class with appropriate form and take them
-                        for student in c.students:
+                        # Loop through all students in the class to give
+                        # Check that the student has the new course in their
+                        # preferences and is in the correct form
+                        valid_student_index = -1
+
+                        for i, student in enumerate(c.students):
                             if student.form == str(gradeIndex + 3) and course in student.preferences:
-                                move_student(student, course)
-                                find = True
+                                valid_student_index = i
                                 break
-                        if find:
+
+                        # If we found a useable student index, then move the student
+                        # Otherwise, continue looping through classes
+                        if valid_student_index != -1:
+                            move_student(c.students[valid_student_index], course)
                             break
 
-            # Re-sort courses and students
-            # bad_courses.sort(key=lambda x : len(x.students))
+
+            # Re-sort students to ensure that underclassmen priority is maintained
+            # as students are added/removed
             sortedStudents = sorted(course.students, key=attrgetter('form'))
 
-            # Re-calculate disparity and distribution
+            # Re-calculate disparity and distribution after changes
             disparity = course.disparity()
             dist = course.distribution()
 
