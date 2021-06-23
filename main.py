@@ -1,3 +1,8 @@
+# TODO LIST:
+# - pre script to make sure all of the courses have at least 6 signups
+# - course-specific student limits?
+# - limiting courses based on grade level?
+
 # Pandas, of course
 import pandas as pd
 
@@ -130,6 +135,8 @@ def assign():
             # Distribution is good, but we have a surplus.
             # So, put a student in a class they prefer without ruining distribution.
             if min(dist) > 1 and disparity > 0:
+                # TODO: LOOP THROUGH ALL FIRST CHOICE, then ALL SECOND CHOICE
+
                 # Check all students in the problem class, *starting with youngest*
                 for s in sortedStudents:
                     # Ensure distribution remains valid (convert form to index)
