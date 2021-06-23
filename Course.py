@@ -5,6 +5,16 @@ NUM_COURSES = 40
 
 # MAKE A SATISTFACTION SCORE
 
+"""
+
+This class represents a course with two fields.
+
+Name: name of the course
+Student: list of all student objects currently assigned that course
+
+"""
+
+
 class Course:
     # Fields
     def __init__(self, n, s):
@@ -12,15 +22,18 @@ class Course:
         self.students = s
 
     # Methods
+    # Returns the size of the class
     def size(self):
         return len(self.students)
 
+    # Returns the distribution of grades in a given class
     def age_distribution(self):
         counts = {"3": 0, "4": 0, "5": 0}
         for s in self.students:
             counts[s.form] += 1
         return counts
 
+    # Checks whether a class is valid --> both distribution and size
     def isValid(self):
         for key, val in self.age_distribution().items():
             if val <= 2:
@@ -29,6 +42,7 @@ class Course:
             return False
         return True
 
+    # Calculates the disparity of the class
     def disparity(self):
         # Disparity is a measurement of the difference between the ideal class
         # size and the current class size
@@ -45,6 +59,7 @@ class Course:
         else:
             return 0
 
+    # Returns the distribution of grades using a list instead of dictionary
     def distribution(self):
         a = [0, 0, 0]
 

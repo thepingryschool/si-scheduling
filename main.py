@@ -119,7 +119,7 @@ def assign():
         # Calculate the disparity for the current course
         disparity = course.disparity()
 
-        # Calculate the distributino for the current course
+        # Calculate the distribution for the current course
         # e.g. [3,3,3] means 3 frosh, 3 soph, 3 junior
         dist = course.distribution()
 
@@ -164,22 +164,30 @@ def assign():
                     # Ignore the current problem course and ensure that giving a
                     # student will not disrupt the distribution
                     if c is not course and c.distribution()[gradeIndex] > 2:
-                        # Loop through all students in the class to give
-                        # Check that the student has the new course in their
-                        # preferences and is in the correct form
+                        # Loop through all students in each class, first checking
+                        # everyone's first preference, then their second, so on
                         valid_student_index = -1
 
-                        for i, student in enumerate(c.students):
-                            if student.form == str(gradeIndex + 3) and course in student.preferences:
-                                valid_student_index = i
-                                break
+                        found = False
+                        currentIndex = 0
 
-                        # If we found a useable student index, then move the student
+                        while (currentIndex < 5 and not found):
+
+                            for i, student in enumerate(c.students):
+
+                                # Check the form of the student and their current preference level
+                                if student.form == str(gradeIndex + 3) and course == student.preferences[currentIndex]:
+                                    found = True
+                                    valid_student_index = i
+                                    break
+
+                            currentIndex += 1
+
+                        # If we found a useable student index, then move the student and exit
                         # Otherwise, continue looping through classes
                         if valid_student_index != -1:
                             move_student(c.students[valid_student_index], course)
                             break
-
 
             # Re-sort students to ensure that underclassmen priority is maintained
             # as students are added/removed
@@ -193,8 +201,8 @@ def assign():
     for x in CLASSES:
         print(x.name + ": " + str(x.size()) + "")
         for s in x.students:
-            print(s.name + " (" + s.form + ")")
-
+            print(s.name + " (" + s.form + ", " +
+                  str(s.preferences.index(x) + 1) + ")")
         print('\n')
 
 # Simple utility method, moves a student from one course to another
@@ -208,7 +216,6 @@ def move_student(student, new_class):
     new_class.students.append(student)
     student.course = new_class
     print("new", student.course.name)
-    # print()
 
 # Debugging method, shows Classes and Students
 
@@ -221,11 +228,9 @@ def debug_print_vars():
             print(student, end=", ")
         print()
     print("\n\n")
-
     print("STUDENTS")
     for y in STUDENTS:
         print(y.name + ", " + y.course.name + ", " + y.email)
-
     print("\n\n")
 
 
