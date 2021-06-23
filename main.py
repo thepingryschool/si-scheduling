@@ -1,12 +1,21 @@
+# Pandas, of course
 import pandas as pd
+
+# Libraries for interacting with the google sheets API
 import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+
+# Python libraries
 import random
 import csv
 from operator import attrgetter
-from oauth2client.service_account import ServiceAccountCredentials
+
+# Import student and course classes
 from Student import Student
 from Course import Course, MAX_CLASS_SIZE
 
+# CONST for how many students should be in each class per form
+# Other class related consts can be found in ./Course.py
 STUDENTS_PER_FORM = 2
 
 # List of all available classes as Course objects
@@ -32,7 +41,7 @@ def get_sheet_data():
 
 
 def process_data():
-    # Get the data from the API
+    # Get the data from the spreadsheet using Google API
     data = get_sheet_data()
 
     # Get the course names from the spreadsheet
@@ -86,11 +95,11 @@ def process_data():
 # 1) Assign each student their top choice (initialized)
 # 2) Determine which classes are problematic and which aren't
 #       - Only working with the problem classes from now on
-# 3) Iterate through classes --> move random (starting with underclassmen)
-#        to their second choice class.
-# 4) Check whether all issues are resolved, and if not, keep looping
-
-
+# 3) Determine whether the problem class has a surplus or a shortage
+#       - Surplus --> push youngest student to their second choice class without
+#           ruining the grade distribution
+#       - Shortage --> pull student with problem class in their preferences
+#           and remedy grade distribution.
 def assign():
     # Find the courses with problems
     bad_courses = [c for c in CLASSES if not c.isValid()]
@@ -98,16 +107,8 @@ def assign():
     # Sort problematic courses based on size
     bad_courses.sort(key=lambda x: len(x.students))
 
-    print("BEFORE")
-    for x in bad_courses:
-        print(x.name + ": " + str(x.size()) + " --> ", end="")
-        print(x.distribution())
-    print()
-
     for course in bad_courses:
-        print(course.name + "NAME")
-
-        # Sort students based on their form (ascending)
+        # Sort students based on their form (ascending, youngest first)
         # Sorting guarantees that later down the line, moving students around
         # begins with underclassmen, therefore ensuring upperclassmen priority
         sortedStudents = sorted(course.students, key=attrgetter('form'))
@@ -126,11 +127,8 @@ def assign():
 
         # Keep looping until the current course's problems are resolved
         while abs(disparity) > 0 or min(dist) < 2:
-            # print("dist" + str(dist))
-            # print(disparity)
-
             # Distribution is good, but we have a surplus.
-            # So, put a young student in a class they prefer.
+            # So, put a student in a class they prefer without ruining distribution.
             if min(dist) > 1 and disparity > 0:
                 # Check all students in the problem class, *starting with youngest*
                 for s in sortedStudents:
@@ -154,30 +152,34 @@ def assign():
             # take a form-specific student from another class, remedying the
             # disparity and distribution problems at the same time.
             elif min(dist) < 2:
-                print("changing bottom")
                 # Figure out which form needs fixing in the class
                 gradeIndex = dist.index(min(dist))
 
+                # Whether the current class is fixable or not.
+                # Based on data given, some classes may end up being unfixable,
+                # meaning that there is no way to meet the conditions for the course.
+                # In this case, we flag the course as unfixable and lock it in.
                 fixable = False
 
-                # Loop through all available classes
+                # Loop through ALL available classes, not just bad ones, so as to
+                # maximize potential fixer-students.
                 for c in CLASSES:
                     # Ignore the current problem course and ensure that giving a
-                    # student will not disrupt the distribution
+                    # student will not disrupt the distribution. If a course has
+                    # been deemed unfixable, we also should not take students from it.
                     if c is not course and c.distribution()[gradeIndex] > 2 and course.fixable:
-                        # Loop through all students in each class, first checking
-                        # everyone's first preference, then their second, so on
+                        # Stores the index of the student to be moved
                         valid_student_index = -1
 
+                        # Loop through all students in each class, first checking
+                        # everyone's first preference, then their second, and so on
                         found = False
                         currentIndex = 0
 
                         while (currentIndex < 5 and not found):
-
                             currentIndex += 1
 
                             for i, student in enumerate(c.students):
-
                                 # Check the form of the student and their current preference level
                                 if student.form == str(gradeIndex + 3) and course == student.preferences[currentIndex - 1]:
                                     found = True
@@ -188,17 +190,17 @@ def assign():
                         # If we found a useable student index, then move the student and exit
                         # Otherwise, continue looping through classes
                         if valid_student_index != -1:
-                            move_student(c.students[valid_student_index], course)
+                            move_student(
+                                c.students[valid_student_index], course)
                             break
 
             # If the entire class collection has been iterated over and there
             # are still no valid options, then flag the course as unfixable
-            # and move on.
+            # and exit.
             if not fixable:
                 # Flag the class as not fixable
                 course.fixable = False
                 break
-
 
             # Re-sort students to ensure that underclassmen priority is maintained
             # as students are added/removed
@@ -208,40 +210,35 @@ def assign():
             disparity = course.disparity()
             dist = course.distribution()
 
-    print("AFTER")
-    for x in CLASSES:
-        print(x.name + ": " + str(x.size()) + "")
-        for s in x.students:
-            print(s.name + " (" + s.form + ", " +
-                  str(s.preferences.index(x) + 1) + ")")
-        print('\n')
-
-
+# Convert course to a Veracross formatted class enrollment CSV
+# Find more information in the README file.
 def courses_to_csv():
+    # Open the .csv file and utilize python csv package
     f = open('class_roster.csv', 'w')
     writer = csv.writer(f)
-    first_row = ["veracross_class_id","class_id","school_year","veracross_student_id","enrollment_level_id"]
+
+    # Title row of the csv file
+    first_row = ["veracross_class_id", "class_id", "school_year",
+                 "veracross_student_id", "enrollment_level_id"]
     writer.writerow(first_row)
+
+    # For each student, create a new row with course and student info
     for s in STUDENTS:
-        new_row = [s.course.name, s.course.name,"2021-22",s.email,s.form]
+        new_row = [s.course.name, s.course.name, "2021-22", s.email, s.form]
         writer.writerow(new_row)
+
     f.close()
 
 
 # Simple utility method, moves a student from one course to another
 # NOTE: assumes that the student is already enrolled in old_class
-
-
 def move_student(student, new_class):
-    # print("old", student.course.name)
     old_class = student.course
     old_class.students.remove(student)
     new_class.students.append(student)
     student.course = new_class
-    # print("new", student.course.name)
 
 # Debugging method, shows Classes and Students
-
 def debug_print_vars():
     print("CLASSES")
     for x in CLASSES:
@@ -255,6 +252,7 @@ def debug_print_vars():
         print(y.name + ", " + y.course.name + ", " + y.email)
     print("\n\n")
 
+# Utility method to print the analytics of our scheduling.
 def print_analytics():
     total_pref = 0
     num_students = len(STUDENTS)
@@ -272,10 +270,8 @@ def print_analytics():
     print("AVERAGE COURSE SIZE: " + str(total_clength / num_courses))
 
 
-
 def main():
     process_data()
-    # debug_print_vars()
     assign()
     courses_to_csv()
     print_analytics()
