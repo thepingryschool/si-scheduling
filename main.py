@@ -1,6 +1,7 @@
 import pandas as pd
 import gspread
 import random
+import csv
 from operator import attrgetter
 from oauth2client.service_account import ServiceAccountCredentials
 from Student import Student
@@ -26,7 +27,7 @@ def get_sheet_data():
     client = gspread.authorize(creds)
 
     # Open the sheet and read data using gspread library
-    sheet = client.open("Spring Intensive Signup (Responses)").sheet1
+    sheet = client.open("Spring Intensive Signup (Responses)").get_worksheet(2)
     return sheet.get_all_values()
 
 
@@ -125,8 +126,8 @@ def assign():
 
         # Keep looping until the current course's problems are resolved
         while abs(disparity) > 0 or min(dist) < 2:
-            print("dist" + str(dist))
-            print(disparity)
+            # print("dist" + str(dist))
+            # print(disparity)
 
             # Distribution is good, but we have a surplus.
             # So, put a young student in a class they prefer.
@@ -157,13 +158,13 @@ def assign():
                 # Figure out which form needs fixing in the class
                 gradeIndex = dist.index(min(dist))
 
-                find = False
+                fixable = False
 
                 # Loop through all available classes
                 for c in CLASSES:
                     # Ignore the current problem course and ensure that giving a
                     # student will not disrupt the distribution
-                    if c is not course and c.distribution()[gradeIndex] > 2:
+                    if c is not course and c.distribution()[gradeIndex] > 2 and course.fixable:
                         # Loop through all students in each class, first checking
                         # everyone's first preference, then their second, so on
                         valid_student_index = -1
@@ -173,21 +174,31 @@ def assign():
 
                         while (currentIndex < 5 and not found):
 
+                            currentIndex += 1
+
                             for i, student in enumerate(c.students):
 
                                 # Check the form of the student and their current preference level
-                                if student.form == str(gradeIndex + 3) and course == student.preferences[currentIndex]:
+                                if student.form == str(gradeIndex + 3) and course == student.preferences[currentIndex - 1]:
                                     found = True
+                                    fixable = True
                                     valid_student_index = i
                                     break
-
-                            currentIndex += 1
 
                         # If we found a useable student index, then move the student and exit
                         # Otherwise, continue looping through classes
                         if valid_student_index != -1:
                             move_student(c.students[valid_student_index], course)
                             break
+
+            # If the entire class collection has been iterated over and there
+            # are still no valid options, then flag the course as unfixable
+            # and move on.
+            if not fixable:
+                # Flag the class as not fixable
+                course.fixable = False
+                break
+
 
             # Re-sort students to ensure that underclassmen priority is maintained
             # as students are added/removed
@@ -205,20 +216,31 @@ def assign():
                   str(s.preferences.index(x) + 1) + ")")
         print('\n')
 
+
+def courses_to_csv():
+    f = open('class_roster.csv', 'w')
+    writer = csv.writer(f)
+    first_row = ["veracross_class_id","class_id","school_year","veracross_student_id","enrollment_level_id"]
+    writer.writerow(first_row)
+    for s in STUDENTS:
+        new_row = [s.course.name, s.course.name,"2021-22",s.email,s.form]
+        writer.writerow(new_row)
+    f.close()
+
+
 # Simple utility method, moves a student from one course to another
 # NOTE: assumes that the student is already enrolled in old_class
 
 
 def move_student(student, new_class):
-    print("old", student.course.name)
+    # print("old", student.course.name)
     old_class = student.course
     old_class.students.remove(student)
     new_class.students.append(student)
     student.course = new_class
-    print("new", student.course.name)
+    # print("new", student.course.name)
 
 # Debugging method, shows Classes and Students
-
 
 def debug_print_vars():
     print("CLASSES")
@@ -233,11 +255,29 @@ def debug_print_vars():
         print(y.name + ", " + y.course.name + ", " + y.email)
     print("\n\n")
 
+def print_analytics():
+    total_pref = 0
+    num_students = len(STUDENTS)
+
+    total_clength = 0
+    num_courses = len(CLASSES)
+
+    for student in STUDENTS:
+        total_pref = student.preferences.index(student.course) + 1
+
+    for course in CLASSES:
+        total_clength += course.size()
+
+    print("AVERAGE PREFERENCE LEVEL: " + str(total_pref / num_students + 1))
+    print("AVERAGE COURSE SIZE: " + str(total_clength / num_courses))
+
+
 
 def main():
     process_data()
     # debug_print_vars()
     assign()
-
+    courses_to_csv()
+    print_analytics()
 
 main()

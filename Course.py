@@ -20,6 +20,7 @@ class Course:
     def __init__(self, n, s):
         self.name = n
         self.students = s
+        self.fixable = True
 
     # Methods
     # Returns the size of the class
