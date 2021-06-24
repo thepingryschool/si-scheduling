@@ -2,6 +2,7 @@
 MAX_CLASS_SIZE = 16
 MIN_CLASS_SIZE = 6
 NUM_COURSES = 40
+NUM_STUDENTS = 400
 
 # MAKE A SATISTFACTION SCORE
 
@@ -39,7 +40,7 @@ class Course:
         for key, val in self.age_distribution().items():
             if val <= 2:
                 return False
-        if self.size() < 6 or self.size() > 16:
+        if self.size() < MIN_CLASS_SIZE or self.size() > MAX_CLASS_SIZE:
             return False
         return True
 
@@ -73,3 +74,10 @@ class Course:
                 a[2] += 1
 
         return a
+
+    # Measure of how far we are from perfection
+    # Minimum is 0
+    def cost(self):
+        avg_size = NUM_STUDENTS/NUM_COURSES
+        pref_disparity = [s.preferences[index(s.course)] - 1 for s in self.students]
+        return (self.size() - avg_size)**2 + sum(pref_disparity)
