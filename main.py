@@ -1,7 +1,9 @@
 # TODO LIST:
 # - pre script to make sure all of the courses have at least 6 signups
-# - course-specific student limits?
+# - course-specific student limits? (build into object-oriented stuff)
 # - limiting courses based on grade level?
+# - prioritize the course running over student getting top priority
+# - more test data? randomness component? satisfaction score?
 
 # Pandas, of course
 import pandas as pd
@@ -17,7 +19,7 @@ from operator import attrgetter
 
 # Import student and course classes
 from Student import Student
-from Course import Course, MAX_CLASS_SIZE
+from Course import Course, MAX_CLASS_SIZE, MIN_CLASS_SIZE
 
 # CONST for how many students should be in each class per form
 # Other class related consts can be found in ./Course.py
@@ -96,6 +98,36 @@ def process_data():
         STUDENTS.append(s)
         firstChoice.students.append(s)
 
+    prescreen()
+
+# Method to screen every class before processing preferences. If the class has
+# less than 6 signups, it is removed from the courses list and its students are
+# relocated to other classes.
+def prescreen():
+    # Dictionary to count the number of students in each course
+    count = {}
+
+    # Loop through each course, initializing dict
+    for course in CLASSES:
+        count[course.name] = 0
+
+    # Loop through each student's preferences
+    for s in STUDENTS:
+        for p in s.preferences:
+            count[p.name] += 1
+
+    # Check if any course has less than six signups overall
+    # Move all students in those problem courses to the next viable course
+    for key,val in count.items():
+        if val < 6:
+            for c in CLASSES:
+                if c.name == key:
+                    c.fixable = False
+                    for s in c.students:
+                        index = 0
+                        while s.preferences[preferences.index(key) + index].fixable == False and index < 5:
+                            s.course = s.preferences[preferences.index(key) + index]
+
 # There are three steps in the assignment process:
 # 1) Assign each student their top choice (initialized)
 # 2) Determine which classes are problematic and which aren't
@@ -131,29 +163,29 @@ def assign():
         dist = course.distribution()
 
         # Keep looping until the current course's problems are resolved
-        while abs(disparity) > 0 or min(dist) < 2:
+        while (abs(disparity) > 0 or min(dist) < 2) and course.fixable:
             # Distribution is good, but we have a surplus.
             # So, put a student in a class they prefer without ruining distribution.
             if min(dist) > 1 and disparity > 0:
-                # TODO: LOOP THROUGH ALL FIRST CHOICE, then ALL SECOND CHOICE
+                current_pref_index = 0
+                found = False
 
-                # Check all students in the problem class, *starting with youngest*
-                for s in sortedStudents:
-                    # Ensure distribution remains valid (convert form to index)
-                    if dist[int(s.form) - 3] > 2:
-                        # Find one of the user's preferences that has room for
-                        # the new student. If no preferences have room, continue
-                        # to the next youngest student in the problem course
-                        valid_pref_index = -1
-
-                        for i, pref in enumerate(s.preferences):
-                            if pref.size() + 1 < MAX_CLASS_SIZE:
-                                valid_pref_index = i
+                # Loop through all students' first choice, then second, and so on
+                while current_pref_index < 5 and not found:
+                    # Check all students in the problem class, *starting with youngest*
+                    for s in sortedStudents:
+                        # Ensure distribution remains valid in the student's
+                        # current course (convert form to index)
+                        if dist[int(s.form) - 3] > 2:
+                            # Find one of the user's preferences that has room for
+                            # the new student. If no preferences have room, continue
+                            # to the next youngest student in the problem course
+                            if s.preferences[current_pref_index].size() + 1 < MAX_CLASS_SIZE:
+                                found = True
+                                move_student(s, s.preferences[current_pref_index])
                                 break
 
-                        if valid_pref_index != -1:
-                            move_student(s, s.preferences[valid_pref_index])
-                            break
+                    current_pref_index += 1
 
             # Distribution is incorrect (implying a shortage), so we need to
             # take a form-specific student from another class, remedying the
@@ -162,52 +194,12 @@ def assign():
                 # Figure out which form needs fixing in the class
                 gradeIndex = dist.index(min(dist))
 
-                # Whether the current class is fixable or not.
-                # Based on data given, some classes may end up being unfixable,
-                # meaning that there is no way to meet the conditions for the course.
-                # In this case, we flag the course as unfixable and lock it in.
-                fixable = False
-
-                # Loop through ALL available classes, not just bad ones, so as to
-                # maximize potential fixer-students.
-                for c in CLASSES:
-                    # Ignore the current problem course and ensure that giving a
-                    # student will not disrupt the distribution. If a course has
-                    # been deemed unfixable, we also should not take students from it.
-                    if c is not course and c.distribution()[gradeIndex] > 2 and course.fixable:
-                        # Stores the index of the student to be moved
-                        valid_student_index = -1
-
-                        # Loop through all students in each class, first checking
-                        # everyone's first preference, then their second, and so on
-                        found = False
-                        currentIndex = 0
-
-                        while (currentIndex < 5 and not found):
-                            currentIndex += 1
-
-                            for i, student in enumerate(c.students):
-                                # Check the form of the student and their current preference level
-                                if student.form == str(gradeIndex + 3) and course == student.preferences[currentIndex - 1]:
-                                    found = True
-                                    fixable = True
-                                    valid_student_index = i
-                                    break
-
-                        # If we found a useable student index, then move the student and exit
-                        # Otherwise, continue looping through classes
-                        if valid_student_index != -1:
-                            move_student(
-                                c.students[valid_student_index], course)
-                            break
-
-            # If the entire class collection has been iterated over and there
-            # are still no valid options, then flag the course as unfixable
-            # and exit.
-            if not fixable:
-                # Flag the class as not fixable
-                course.fixable = False
-                break
+                # If we fail to take a student from the specific grade,
+                # we lower our standard and take ANY student who has
+                # this course preference
+                if not take_student(course, gradeIndex + 3):
+                    # Flag the class as not fixable if we again fail
+                    course.fixable = take_student(course)
 
             # Re-sort students to ensure that underclassmen priority is maintained
             # as students are added/removed
@@ -216,6 +208,28 @@ def assign():
             # Re-calculate disparity and distribution after changes
             disparity = course.disparity()
             dist = course.distribution()
+
+# Take any student with the given course in their preferences
+# returns True if student is found, False if otherwise
+def take_student(course, form = 1):
+    pref_index = 0
+
+    while pref_index < 5:
+
+        for student in STUDENTS:
+            # Check that the user has the course in their prefs and is not
+            # already in the course
+            if student.preferences[pref_index] == course and student.course != course and student.course.size() > MIN_CLASS_SIZE:
+                # If a user specifies a form, thne check the form too.
+                # Otherwise, as soon as there is a match, return it.
+                if form == 1 or student.form == str(form):
+                    move_student(student, course)
+                    return True
+
+        pref_index += 1
+
+    return False
+
 
 # Convert course to a Veracross formatted class enrollment CSV
 # Find more information in the README file.
@@ -247,17 +261,8 @@ def move_student(student, new_class):
 
 # Debugging method, shows Classes and Students
 def debug_print_vars():
-    print("CLASSES")
     for x in CLASSES:
-        print(x.name + ": ", end='')
-        for student in x.students:
-            print(student, end=", ")
-        print()
-    print("\n\n")
-    print("STUDENTS")
-    for y in STUDENTS:
-        print(y.name + ", " + y.course.name + ", " + y.email)
-    print("\n\n")
+        print(x.name + ": " + str(x.size()) + " --> " + str(x.cost()))
 
 # Utility method to print the analytics of our scheduling.
 def print_analytics():
@@ -280,7 +285,8 @@ def print_analytics():
 def main():
     process_data()
     assign()
-    courses_to_csv()
+    # courses_to_csv()
+    debug_print_vars()
     print_analytics()
 
 main()
