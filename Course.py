@@ -8,20 +8,25 @@ NUM_STUDENTS = 400
 
 """
 
-This class represents a course with two fields.
+This class represents a course with six fields.
 
-Name: name of the course
-Student: list of all student objects currently assigned that course
-
+name: name of the course
+student: list of all student objects currently assigned that course
+fixable: designates whether a given class can be made to fit the requirements (based on signups, but assumed True to start)
+min_size and max_size: class-specific requirements on the minimum and maximum number of students allowed
+id: the veracross_class_id, which is fed into the program
 """
 
 
 class Course:
     # Fields
-    def __init__(self, n, s):
+    def __init__(self, n, s, min_size, max_size, id):
         self.name = n
         self.students = s
         self.fixable = True
+        self.min_size = min_size
+        self.max_size = max_size
+        self.id = id
 
     # Methods
     # Returns the size of the class
@@ -40,7 +45,7 @@ class Course:
         for key, val in self.age_distribution().items():
             if val <= 2:
                 return False
-        if self.size() < MIN_CLASS_SIZE or self.size() > MAX_CLASS_SIZE:
+        if self.size() < self.min_size or self.size() > self.max_size:
             return False
         return True
 
@@ -50,12 +55,12 @@ class Course:
         # size and the current class size
 
         # If the class is too big, disparity is positive
-        if self.size() > MAX_CLASS_SIZE:
-            return self.size() - MAX_CLASS_SIZE
+        if self.size() > self.max_size:
+            return self.size() - self.max_size
 
         # If the class is too small, disparity is negative
-        elif self.size() < MIN_CLASS_SIZE:
-            return self.size() - MIN_CLASS_SIZE
+        elif self.size() < self.min_size:
+            return self.size() - self.min_size
 
         # If the class is within the good bounds, disparity is 0
         else:
@@ -79,5 +84,5 @@ class Course:
     # Minimum is 0
     def cost(self):
         avg_size = NUM_STUDENTS/NUM_COURSES
-        pref_disparity = [s.preferences[index(s.course)] - 1 for s in self.students]
+        pref_disparity = [s.preferences.index(s.course) - 1 for s in self.students]
         return (self.size() - avg_size)**2 + sum(pref_disparity)
