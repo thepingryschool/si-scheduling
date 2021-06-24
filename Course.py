@@ -83,4 +83,4 @@ class Course:
     def cost(self):
         avg_size = NUM_STUDENTS/NUM_COURSES
         pref_disparity = [s.preferences.index(s.course) for s in self.students]
-        return (self.size() - avg_size)**2 + sum(pref_disparity)
+        return sum(pref_disparity)
