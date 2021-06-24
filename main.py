@@ -32,7 +32,7 @@ CLASSES = []
 STUDENTS = []
 
 
-def get_sheet_data():
+def get_sheet_data(sheet_number):
     # Use OAUTH2 and Google API client to authorize the application with gspread
     # gspread is a pip library for interacting with the google sheets API
     # Learn more about the Google API client here: https://developers.google.com/sheets/api
@@ -43,13 +43,15 @@ def get_sheet_data():
     client = gspread.authorize(creds)
 
     # Open the sheet and read data using gspread library
-    sheet = client.open("Spring Intensive Signup (Responses)").get_worksheet(2)
+    sheet = client.open("Spring Intensive Signup (Responses)").get_worksheet(sheet_number)
     return sheet.get_all_values()
+
 
 
 def process_data():
     # Get the data from the spreadsheet using Google API
-    data = get_sheet_data()
+    data = get_sheet_data(2)
+    course_specific_info = get_sheet_data(3)
 
     # Get the course names from the spreadsheet
     # Course names are stored in the first row of the spreadsheet with the format:
@@ -60,8 +62,20 @@ def process_data():
             # Remove the surrounding parts of the course name
             className = cell[22:len(cell) - 1]
 
+            # Set default values for the course info (used when not provided)
+            id = "unknown"
+            min_size = MIN_CLASS_SIZE
+            max_size = MAX_CLASS_SIZE
+
+            # Loop through spreadsheet containing course specific info
+            for row in course_specific_info:
+                if row[0] == className:
+                    id = row[1]
+                    min_size = row[2]
+                    max_size = row[3]
+
             # Add class name to array
-            CLASSES.append(Course(className, []))
+            CLASSES.append(Course(className, [], int(min_size), int(max_size), id))
 
     # Iterate over the rows of sheet data
     # For each student, create a Student object with the appropriate fields
@@ -98,12 +112,17 @@ def process_data():
         STUDENTS.append(s)
         firstChoice.students.append(s)
 
+    # Screen the input data. Each course must have at least 6 signups. If not, it
+    # is emptied and its students are relocated to other courses.
     prescreen()
 
 # Method to screen every class before processing preferences. If the class has
 # less than 6 signups, it is removed from the courses list and its students are
 # relocated to other classes.
 def prescreen():
+    for c in CLASSES:
+        print(c.name + "[" + str(c.min_size) + ", " + str(c.max_size) + "]")
+
     # Dictionary to count the number of students in each course
     count = {}
 
@@ -122,9 +141,14 @@ def prescreen():
         if val < 6:
             for c in CLASSES:
                 if c.name == key:
+                    # Courses are deemed unfixable if they have less than 6 signups
                     c.fixable = False
+
+                    # Loop through all students in the course and relocate them to 2nd choice
                     for s in c.students:
                         index = 0
+
+                        # Make sure the student is not relocated into another unfixable course
                         while s.preferences[preferences.index(key) + index].fixable == False and index < 5:
                             s.course = s.preferences[preferences.index(key) + index]
 
@@ -133,8 +157,8 @@ def prescreen():
 # 2) Determine which classes are problematic and which aren't
 #       - Only working with the problem classes from now on
 # 3) Determine whether the problem class has a surplus or a shortage
-#       - Surplus --> push youngest student to their second choice class without
-#           ruining the grade distribution
+#       - Surplus --> push student to their next lowest choice class available
+#           without ruining the grade distribution
 #       - Shortage --> pull student with problem class in their preferences
 #           and remedy grade distribution.
 def assign():
@@ -148,11 +172,13 @@ def assign():
         # Sort students based on their form (ascending, youngest first)
         # Sorting guarantees that later down the line, moving students around
         # begins with underclassmen, therefore ensuring upperclassmen priority
+        # and is ultimately more efficient because younger students are more
+        # likely to be moved.
         sortedStudents = sorted(course.students, key=attrgetter('form'))
 
-        # Disparity is positive when surplus, negative when shortage
-        #       if surplus (disparity positive) --> remove a student
-        #       if shortage (disparity negative) --> add a student
+        # Disparity is positive when surplus, negative when shortage.
+        #       If surplus (disparity positive) --> remove a student.
+        #       If shortage (disparity negative) --> add a student.
         # See definition in Course.py for more info.
 
         # Calculate the disparity for the current course
@@ -164,32 +190,51 @@ def assign():
 
         # Keep looping until the current course's problems are resolved
         while (abs(disparity) > 0 or min(dist) < 2) and course.fixable:
-            # Distribution is good, but we have a surplus.
+            # Distribution is okay, but we have a surplus.
             # So, put a student in a class they prefer without ruining distribution.
             if min(dist) > 1 and disparity > 0:
-                current_pref_index = 0
-                found = False
+                # Determine which form should be moved out. Four seats in each
+                # class are reserved for freshmen and another four for sophomores,
+                # We model using a stack. Freshmen are top priority to move (because upperclassmen priority),
+                # but if too few freshman, we look for sophomores, etc.
+                form_to_move = [3]
+                if dist[0] <= 4:
+                    form_to_move.append(4)
+                elif dist[1] <= 4:
+                    form_to_move.append(5)
 
-                # Loop through all students' first choice, then second, and so on
-                while current_pref_index < 5 and not found:
-                    # Check all students in the problem class, *starting with youngest*
-                    for s in sortedStudents:
-                        # Ensure distribution remains valid in the student's
-                        # current course (convert form to index)
-                        if dist[int(s.form) - 3] > 2:
-                            # Find one of the user's preferences that has room for
-                            # the new student. If no preferences have room, continue
-                            # to the next youngest student in the problem course
-                            if s.preferences[current_pref_index].size() + 1 < MAX_CLASS_SIZE:
+                while len(form_to_move) != 0:
+
+                    current_pref_index = 0
+                    found = False
+
+                    # Loop through all students' first choice, then second, and so on
+                    while current_pref_index < 5 and not found:
+                        # Check all students in the problem class, *starting with youngest*
+                        for s in sortedStudents:
+                            # Check that the student is in the correct form and check
+                            # the students preferred course to see if it has space for them
+                            if      dist[form_to_move[-1] - 3] > 2 and \
+                                    s.form == str(form_to_move[-1]) and \
+                                    s.preferences[current_pref_index].name != s.course.name and \
+                                    s.preferences[current_pref_index].size() + 1 <= s.preferences[current_pref_index].max_size:
+
                                 found = True
+                                form_to_move = []
                                 move_student(s, s.preferences[current_pref_index])
                                 break
 
-                    current_pref_index += 1
+                        current_pref_index += 1
 
-            # Distribution is incorrect (implying a shortage), so we need to
-            # take a form-specific student from another class, remedying the
-            # disparity and distribution problems at the same time.
+                    # If we couldn't find a student in the desired form with the right preference
+                    # we pop from the stack and look to the next best form
+                    if (len(form_to_move) != 0):
+                        form_to_move.pop()
+
+            # Distribution is incorrect, so we need to take a form-specific student
+            # from another class, remedying the distribution problem. If this extra
+            # student creates a surplus, it will be resolved in the next iteration
+            # of the outmost while loop.
             elif min(dist) < 2:
                 # Figure out which form needs fixing in the class
                 gradeIndex = dist.index(min(dist))
@@ -201,25 +246,25 @@ def assign():
                     # Flag the class as not fixable if we again fail
                     course.fixable = take_student(course)
 
-            # Re-sort students to ensure that underclassmen priority is maintained
-            # as students are added/removed
-            sortedStudents = sorted(course.students, key=attrgetter('form'))
-
             # Re-calculate disparity and distribution after changes
             disparity = course.disparity()
             dist = course.distribution()
 
 # Take any student with the given course in their preferences
-# returns True if student is found, False if otherwise
+# Returns True if student is found, False if otherwise
 def take_student(course, form = 1):
+    # Current preference index
     pref_index = 0
 
+    # Loop through every students first index, then their second index, so on
     while pref_index < 5:
-
         for student in STUDENTS:
-            # Check that the user has the course in their prefs and is not
-            # already in the course
-            if student.preferences[pref_index] == course and student.course != course and student.course.size() > MIN_CLASS_SIZE:
+            # Check that the student has the course in their preferences, is
+            # not already in that class, and that new and old classes have space.
+            if student.preferences[pref_index] == course \
+                    and student.course != course \
+                    and student.course.size() > student.course.min_size \
+                    and student.preferences[pref_index].size() + 1 < student.preferences[pref_index].max_size:
                 # If a user specifies a form, thne check the form too.
                 # Otherwise, as soon as there is a match, return it.
                 if form == 1 or student.form == str(form):
@@ -228,8 +273,16 @@ def take_student(course, form = 1):
 
         pref_index += 1
 
+    # Return false if nothing valid is found
     return False
 
+# Simple utility method, moves a student from one course to another
+# NOTE: assumes that the student is already enrolled in old_class
+def move_student(student, new_class):
+    old_class = student.course
+    old_class.students.remove(student)
+    new_class.students.append(student)
+    student.course = new_class
 
 # Convert course to a Veracross formatted class enrollment CSV
 # Find more information in the README file.
@@ -245,19 +298,11 @@ def courses_to_csv():
 
     # For each student, create a new row with course and student info
     for s in STUDENTS:
-        new_row = [s.course.name, s.course.name, "2021-22", s.email, s.form]
+        new_row = [s.course.id, s.course.name, "2021-22", s.email, s.form]
         writer.writerow(new_row)
 
     f.close()
 
-
-# Simple utility method, moves a student from one course to another
-# NOTE: assumes that the student is already enrolled in old_class
-def move_student(student, new_class):
-    old_class = student.course
-    old_class.students.remove(student)
-    new_class.students.append(student)
-    student.course = new_class
 
 # Debugging method, shows Classes and Students
 def debug_print_vars():
@@ -285,7 +330,7 @@ def print_analytics():
 def main():
     process_data()
     assign()
-    # courses_to_csv()
+    courses_to_csv()
     debug_print_vars()
     print_analytics()
 

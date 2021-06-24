@@ -4,8 +4,6 @@ MIN_CLASS_SIZE = 6
 NUM_COURSES = 40
 NUM_STUDENTS = 400
 
-# MAKE A SATISTFACTION SCORE
-
 """
 
 This class represents a course with six fields.
@@ -84,5 +82,5 @@ class Course:
     # Minimum is 0
     def cost(self):
         avg_size = NUM_STUDENTS/NUM_COURSES
-        pref_disparity = [s.preferences.index(s.course) - 1 for s in self.students]
+        pref_disparity = [s.preferences.index(s.course) for s in self.students]
         return (self.size() - avg_size)**2 + sum(pref_disparity)

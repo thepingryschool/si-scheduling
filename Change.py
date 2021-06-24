@@ -1,5 +1,4 @@
-# This class describes a given change we would like to make to the scheduling system
-# We compare changes based on their relative utility!
+
 
 class Change:
     ########################
