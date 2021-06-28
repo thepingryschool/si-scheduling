@@ -8,12 +8,15 @@ in which they will be asked to identify their top 5 choices.
 This code (implemented in Python) takes in the course preferences of students and certain course-specific information (as .csv) and outputs course rosters (as .csv in the Veracross [Class Enrollment Import Type](https://learn.veracross.com/docs/class-enrollment-import-type#uploading-the-data "Class Enrollment Import Type")). We also output statistics regarding the cost (the sum of how far each student is from their top preference), the average preference level of assigned courses, and the average course size.
 
 INSTRUCTIONS FOR USER: 
-1) Download this package to your computer. If on Mac, go to terminal and type: <br />
+1) Navigate to this [folder](https://drive.google.com/drive/folders/1a6nPndI_uVMxW75Ub5PmGNAaQQOcO7X5) which contains both the form and the spreadsheet
+2) Send out "Spring Intensive Signup" form to target audience, collect results
+3) Go to the "Course Data" tab, input information about each course's name, teachers, Veracross Course ID, and size requirements
+4) Download the si-scheduling package to your computer. If on Mac, go to terminal and type: <br />
 ```
 cd path/to/package
 python main.py
 ```
-3) Navigate to this [folder](https://www.youtube.com/watch?v=dQw4w9WgXcQ) which contains both the form and the spreadsheet
+5) Check spreadsheet for results. Will include the same information in three formats: course rosters, students sorted by satisfaction, and the Veracross course-enrollment csv format. 
 
 
 Here are the parameters for class rosters:
