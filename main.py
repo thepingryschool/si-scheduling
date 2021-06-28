@@ -16,6 +16,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 import random
 import csv
 from operator import attrgetter
+import numpy as np
 
 # Import student and course classes
 from Student import Student
@@ -50,8 +51,8 @@ def get_sheet_data(sheet_number):
 
 def process_data():
     # Get the data from the spreadsheet using Google API
-    data = get_sheet_data(1)
-    course_specific_info = get_sheet_data(3)
+    data = get_sheet_data(5)
+    course_specific_info = get_sheet_data(0)
 
     # Get the course names from the spreadsheet
     # Course names are stored in the first row of the spreadsheet with the format:
@@ -66,16 +67,18 @@ def process_data():
             id = "unknown"
             min_size = MIN_CLASS_SIZE
             max_size = MAX_CLASS_SIZE
+            faculty = "unknown"
 
             # Loop through spreadsheet containing course specific info
             for row in course_specific_info:
                 if row[0] == className:
-                    id = row[1]
-                    min_size = row[2]
-                    max_size = row[3]
+                    faculty = row[1]
+                    id = row[2]
+                    min_size = row[3]
+                    max_size = row[4]
 
             # Add class name to array
-            CLASSES.append(Course(className, [], int(min_size), int(max_size), id))
+            CLASSES.append(Course(className, [], int(min_size), int(max_size), id, faculty))
 
     # Iterate over the rows of sheet data
     # For each student, create a Student object with the appropriate fields
@@ -191,16 +194,15 @@ def assign():
             # Distribution is okay, but we have a surplus.
             # So, put a student in a class they prefer without ruining distribution.
             if min(dist) > 1 and disparity > 0:
-                print("fixing surplus")
                 # Determine which form should be moved out. Four seats in each
                 # class are reserved for freshmen and another four for sophomores,
                 # We model using a stack. Freshmen are top priority to move (because upperclassmen priority),
                 # but if too few freshman, we look for sophomores, etc.
                 form_to_move = [3]
 
-                if dist[0] <= 4:
+                if dist[0] <= 0.25* course.max_size: #4:
                     form_to_move.append(4)
-                if dist[1] <= 4:
+                if dist[1] <= 0.25* course.max_size:
                     form_to_move.append(5)
 
                 while len(form_to_move) != 0:
@@ -248,7 +250,6 @@ def assign():
             # student creates a surplus, it will be resolved in the next iteration
             # of the outmost while loop.
             elif min(dist) < 2:
-                print('fixing bottom')
                 # Figure out which form needs fixing in the class
                 gradeIndex = dist.index(min(dist))
 
@@ -256,12 +257,9 @@ def assign():
                 # we lower our standard and take ANY student who has
                 # this course preference
                 if not take_student(course, gradeIndex + 3):
-                    print('second')
                     # Flag the class as not fixable if we again fail
                     course.fixable = take_student(course)
 
-            print("calculating disp")
-            print(min(dist), disparity)
             # Re-calculate disparity and distribution after changes
             disparity = course.disparity()
             dist = course.distribution()
@@ -274,7 +272,6 @@ def take_student(course, form = 1):
 
     # Loop through every students first index, then their second index, so on
     while pref_index < 5:
-        print("stuck?")
         for student in STUDENTS:
             # Check that the student has the course in their preferences, is
             # not already in that class, and that new and old classes have space.
@@ -320,10 +317,45 @@ def courses_to_csv():
 
     f.close()
 
+# Pushes course enrollment data to spreadsheet.
+# Makes two worksheets: one in Veracross format, one in a more visually appealing way
+def courses_to_spreadsheet():
+        scope = ['https://spreadsheets.google.com/feeds',
+                 'https://www.googleapis.com/auth/drive']
+        creds = ServiceAccountCredentials.from_json_keyfile_name(
+            'client_secret.json', scope)
+        client = gspread.authorize(creds)
+        roster1 = client.open("Spring Intensive Signup (Responses)").get_worksheet(2)
+        big = [["Course", "Faculty", "size / max", "fixable?", "Students"]]
+        for c in CLASSES:
+            big.append(c.toList())
+        roster1.update('A1', big)
+
+        roster2 = client.open("Spring Intensive Signup (Responses)").get_worksheet(3)
+        big2 = []
+        big2.append(["Name", "Course Assigned", "Cost"])
+        sortedStudents = sorted(STUDENTS, key= Student.cost , reverse=True)
+        for s in sortedStudents:
+            big2.append(s.toList())
+
+        roster2.update('A1', big2)
+
+        roster3 = client.open("Spring Intensive Signup (Responses)").get_worksheet(4)
+        big3 = []
+        big3.append(["veracross_class_id", "class_id", "school_year",
+                     "veracross_student_id", "enrollment_level_id"])
+        for s in STUDENTS:
+            big3.append([s.course.id, s.course.name, "2021-22", s.email, s.form])
+        roster3.update('A1', big3)
+
+
+
+
+
 
 # Debugging method, shows Classes and Students
 def debug_print_vars():
-    print("\nCLASS ENROLLMENTS\n")
+    print("\nCLASS ENROLLMENTS: " + str(len(STUDENTS)) + " students, " + str(len(CLASSES)) + " courses. \n")
     sumcost = 0
     for x in CLASSES:
         if not x.fixable:
@@ -362,6 +394,7 @@ def main():
     process_data()
     assign()
     courses_to_csv()
+    courses_to_spreadsheet()
     debug_print_vars()
     print_analytics()
 

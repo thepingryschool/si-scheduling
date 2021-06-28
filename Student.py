@@ -18,7 +18,9 @@ class Student:
         self.email = e
         self.form = f
 
-    # Calculates the utility of a student
-    # Higher utility means that the index
-    def utility():
-        return 6 - p.index(c)
+    # Calculates how far a student's assignment is from top choice
+    def cost(self):
+        return self.preferences.index(self.course)
+
+    def toList(self):
+        return [self.name, self.course.name, self.cost()]

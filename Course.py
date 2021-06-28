@@ -13,18 +13,20 @@ student: list of all student objects currently assigned that course
 fixable: designates whether a given class can be made to fit the requirements (based on signups, but assumed True to start)
 min_size and max_size: class-specific requirements on the minimum and maximum number of students allowed
 id: the veracross_class_id, which is fed into the program
+faculty: who is teaching the class
 """
 
 
 class Course:
     # Fields
-    def __init__(self, n, s, min_size, max_size, id):
+    def __init__(self, n, s, min_size, max_size, id, f):
         self.name = n
         self.students = s
         self.fixable = True
         self.min_size = min_size
         self.max_size = max_size
         self.id = id
+        self.faculty = f
 
     # Methods
     # Returns the size of the class
@@ -84,3 +86,13 @@ class Course:
         avg_size = NUM_STUDENTS/NUM_COURSES
         pref_disparity = [s.preferences.index(s.course) for s in self.students]
         return sum(pref_disparity)
+
+    def toList(self):
+        x = [self.name, self.faculty, str(self.size()) + " / " + str(self.max_size), str(self.cost())]
+        if self.fixable:
+            x.append("y")
+        else:
+            x.append("UNFIXABLE")
+        for s in self.students:
+            x.append(s.name +  " (Form " + s.form + "), p#" + str( s.preferences.index(self) + 1 ) )
+        return x
