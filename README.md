@@ -13,7 +13,7 @@ INSTRUCTIONS FOR USER:
 cd path/to/package
 python main.py
 ```
-3) Navigate to this [folder]{} which contains both the form and the spreadsheet
+3) Navigate to this [folder]{https://www.youtube.com/watch?v=dQw4w9WgXcQ} which contains both the form and the spreadsheet
 
 
 Here are the parameters for class rosters:
