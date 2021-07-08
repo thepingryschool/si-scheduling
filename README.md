@@ -9,14 +9,15 @@ This code (implemented in Python) takes in the course preferences of students an
 
 INSTRUCTIONS FOR USER: 
 1) Navigate to this [folder](https://drive.google.com/drive/folders/1a6nPndI_uVMxW75Ub5PmGNAaQQOcO7X5) which contains both the form and the spreadsheet
-2) Send out "Spring Intensive Signup" form to target audience, collect results
-3) Go to the "Course Data" tab, input information about each course's name, teachers, Veracross Course ID, and size requirements
+2) Send out "Spring Intensive Signup" Google Form to target audience, fully collect results.
+3) Go to the "Course Data" tab. This is where you will input information about each course's name, teachers, Veracross Course ID, and size requirements. Also see the column which asks for the number of schedules and a parameter called "alpha." This alpha parameter, which goes from 0 to 1, is supposed to indicate how much age preference should matter when choosing who should be moved out of their top choice class. Alpha = 1 means age takes full priority over course preference; alpha = 0 means all ages are treated the same. An inputted alpha outside the range of 0 and 1 will indicate the desire to use full priority for age. In any case, list as many alphas as the number of schedules you indicate.
 4) Download the si-scheduling package to your computer. If on Mac, go to terminal and type: <br />
 ```
 cd path/to/package
-python main.py
+python main.py real
 ```
-5) Check spreadsheet for results. Will include the same information in three formats: course rosters, students sorted by satisfaction, and the Veracross course-enrollment csv format. 
+NOTE: if you don't include the "real" command-line argument, you will be <br />
+5) Check the folder for results. Will include the same information in three formats: course rosters, students sorted by satisfaction, and the Veracross course-enrollment csv format. 
 
 
 Here are the parameters for class rosters:
