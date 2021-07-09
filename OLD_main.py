@@ -11,14 +11,12 @@ import pandas as pd
 # Libraries for interacting with the google sheets API
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-from apiclient import discovery
 
 # Python libraries
 import random
 import csv
 from operator import attrgetter
 import numpy as np
-import sys
 
 # Import student and course classes
 from Student import Student
@@ -33,17 +31,6 @@ CLASSES = []
 
 # List of all students that signed up on Google Sheets as Student objects
 STUDENTS = []
-
-# List of all ALPHA corresponding to schedules.
-# ALPHA is the parameter from 0 to 1 which judges how relevant age priority is (0 means it has no relevance; 1 means it age fully trumps preference)
-ALPHAS = []
-
-def get_alphas():
-    course_specific_info = get_sheet_data(0)
-    num_schedules = int(course_specific_info[1][5])
-    for i in range(num_schedules):
-        ALPHAS.append(  float(course_specific_info[i+1][6])  )
-    return ALPHAS
 
 
 def get_sheet_data(sheet_number):
@@ -61,16 +48,10 @@ def get_sheet_data(sheet_number):
     return sheet.get_all_values()
 
 
-
-def process_data(real):
+def process_data():
     # Get the data from the spreadsheet using Google API
-    data = []
-    if real:
-        data = get_sheet_data(1)
-    else:
-        data = get_sheet_data(3)
+    data = get_sheet_data(5)
     course_specific_info = get_sheet_data(0)
-    num_schedules = course_specific_info[0][5]
 
     # Get the course names from the spreadsheet
     # Course names are stored in the first row of the spreadsheet with the format:
@@ -86,7 +67,6 @@ def process_data(real):
             min_size = MIN_CLASS_SIZE
             max_size = MAX_CLASS_SIZE
             faculty = "unknown"
-
 
             # Loop through spreadsheet containing course specific info
             for row in course_specific_info:
@@ -124,9 +104,9 @@ def process_data(real):
         firstChoice = CLASSES[row.index("First Choice") - 1]
 
         # Get the user's name, email, and form from the data
-        name = row[2]
-        form = row[len(row) - 2]
-        email = row[1]
+        name = row[len(row) - 3]
+        form = row[len(row) - 1]
+        email = row[len(row) - 2]
 
         # Create a new Student class object and add to list of students
         # STUDENTS ARE INTIAILIZED WITH THEIR FIRST CHOICE AS THEIR COURSE
@@ -179,11 +159,9 @@ def prescreen():
 # 3) Determine whether the problem class has a surplus or a shortage
 #       - Surplus --> push student to their next lowest choice class available
 #           without ruining the grade distribution
-#               NOTE: (this is where alpha parameter comes into play, telling us
-#               how much we care about age in the calculation)
 #       - Shortage --> pull student with problem class in their preferences
 #           and remedy grade distribution.
-def assign(alpha=1):
+def assign():
     # Find the courses with problems
     bad_courses = [c for c in CLASSES if not c.isValid() and c.fixable]
 
@@ -215,10 +193,56 @@ def assign(alpha=1):
             # Distribution is okay, but we have a surplus.
             # So, put a student in a class they prefer without ruining distribution.
             if min(dist) > 1 and disparity > 0:
-                if alpha >= 0 or alpha <= 1:
-                    push_out_student_2(course, alpha)
-                else:
-                    push_out_student_1(course)
+                # Determine which form should be moved out. Four seats in each
+                # class are reserved for freshmen and another four for sophomores,
+                # We model using a stack. Freshmen are top priority to move (because upperclassmen priority),
+                # but if too few freshman, we look for sophomores, etc.
+                form_to_move = [3]
+
+                if dist[0] <= 0.25 * course.max_size: #4:
+                    form_to_move.append(4)
+                if dist[1] <= 0.25 * course.max_size:
+                    form_to_move.append(5)
+
+                while len(form_to_move) != 0:
+
+                    current_pref_index = 0
+                    found = False
+
+                    # Loop through all students' first choice, then second, and so on
+                    while current_pref_index < 5 and not found:
+                        # Course 19 [4, 5, 9]
+                        # Check all students in the problem class, *starting with youngest*
+                        for s in sortedStudents:
+                            # Check that the student is in the correct form and check
+                            # the students preferred course to see if it has space for them
+                            candidate = s.preferences[current_pref_index]
+
+                            if (dist[form_to_move[-1] - 3] > 2 and \
+                                    s.form == str(form_to_move[-1]) and \
+                                    candidate.name != s.course.name and \
+                                    candidate.size() + 1 <= candidate.max_size and \
+                                    candidate.fixable == True ):
+
+                                # Terminate the loops surrounding this block
+                                found = True
+                                form_to_move = []
+
+                                # Remove from the list of sorted students
+                                sortedStudents.remove(s)
+
+                                # Move the student
+                                move_student(s, candidate)
+                                break
+
+                        # If nothing can be founda t teh current preference level,
+                        # move to the next one.
+                        current_pref_index += 1
+
+                    # If we couldn't find a student in the desired form with the right preference
+                    # we pop from the stack and look to the next best form
+                    if (len(form_to_move) != 0):
+                        form_to_move.pop()
 
             # Distribution is incorrect, so we need to take a form-specific student
             # from another class, remedying the distribution problem. If this extra
@@ -238,92 +262,6 @@ def assign(alpha=1):
             # Re-calculate disparity and distribution after changes
             disparity = course.disparity()
             dist = course.distribution()
-
-# Implements stack based method where a student's takes full priority in choosing who is moved out first
-# Deprecated in favor of the alpha-based method
-def push_out_student_1(course):
-    dist = course.distribution()
-    sortedStudents = sorted(course.students, key=attrgetter('form'))
-    # Determine which form should be moved out. Four seats in each
-    # class are reserved for freshmen and another four for sophomores,
-    # We model using a stack. Freshmen are top priority to move (because upperclassmen priority),
-    # but if too few freshman, we look for sophomores, etc.
-    form_to_move = [3]
-
-    if dist[0] <= 0.25 * course.max_size: #4:
-        form_to_move.append(4)
-    if dist[1] <= 0.25 * course.max_size:
-        form_to_move.append(5)
-
-    while len(form_to_move) != 0:
-
-        current_pref_index = 0
-        found = False
-
-        # Loop through all students' first choice, then second, and so on
-        while current_pref_index < 5 and not found:
-            # Course 19 [4, 5, 9]
-            # Check all students in the problem class, *starting with youngest*
-            for s in sortedStudents:
-                # Check that the student is in the correct form and check
-                # the students preferred course to see if it has space for them
-                candidate = s.preferences[current_pref_index]
-
-                if (dist[form_to_move[-1] - 3] > 2 and \
-                        s.form == str(form_to_move[-1]) and \
-                        candidate.name != s.course.name and \
-                        candidate.size() + 1 <= candidate.max_size and \
-                        candidate.fixable == True ):
-
-                    # Terminate the loops surrounding this block
-                    found = True
-                    form_to_move = []
-
-                    # Remove from the list of sorted students
-                    sortedStudents.remove(s)
-
-                    # Move the student
-                    move_student(s, candidate)
-                    return
-
-            # If nothing can be founda t teh current preference level,
-            # move to the next one.
-            current_pref_index += 1
-
-        # If we couldn't find a student in the desired form with the right preference
-        # we pop from the stack and look to the next best form
-        if (len(form_to_move) != 0):
-            form_to_move.pop()
-
-    course.fixable = False
-
-
-# Implements score-based method, where alpha is the 0 to 1 priority given to age
-# Compares all possibilities of students moving out, and scores each based on a linear combination
-# COST = alpha*form + preference + holding_penalty --> choose the lowest cost
-def push_out_student_2(course, alpha):
-    candidates = []
-    found = False
-    # Loop through all students' first choice, then second, and so on
-    for s in course.students:
-        form = s.form
-        for p in s.preferences:
-            if(p.distribution()[int(form)-3] > 2 and \
-                    p.name != s.course.name and \
-                    p.size() + 1 <= p.max_size and \
-                    p.fixable):
-                candidates.append([s, p])
-                break
-
-    # Sort according to a cost function -- essentially a linear combination of student's form and the preference they would be receiving. High is bad.
-    candidates.sort(key = lambda x: ( x[0].preferences.index(x[1]) + alpha*(int(x[0].form)-3) + 5 - course.distribution()[int(x[0].form)-3] if 5 - course.distribution()[int(x[0].form)-3] > 0 else x[0].preferences.index(x[1]) + alpha*(int(x[0].form)-3) ) )
-
-    if len(candidates) > 0:
-        # We choose the student with the lowest cost
-        move_student(candidates[0][0], candidates[0][1])
-    else:
-        course.fixable = False
-
 
 # Take any student with the given course in their preferences
 # Returns True if student is found, False if otherwise
@@ -378,70 +316,40 @@ def courses_to_csv():
 
     f.close()
 
-def totalCost():
-    s = 0
-    for c in CLASSES:
-        s += c.cost()
-    return s
-
-
 # Pushes course enrollment data to spreadsheet.
 # Makes two worksheets: one in Veracross format, one in a more visually appealing way
-def courses_to_spreadsheet(alpha):
-    scope = ['https://spreadsheets.google.com/feeds',
-             'https://www.googleapis.com/auth/drive']
-    creds = ServiceAccountCredentials.from_json_keyfile_name(
-        'client_secret.json', scope)
+def courses_to_spreadsheet():
+        scope = ['https://spreadsheets.google.com/feeds',
+                 'https://www.googleapis.com/auth/drive']
+        creds = ServiceAccountCredentials.from_json_keyfile_name(
+            'client_secret.json', scope)
+        client = gspread.authorize(creds)
+        roster1 = client.open("Spring Intensive Signup (Responses)").get_worksheet(2)
+        big = [["Course", "Faculty", "size / max", "fixable?", "Students"]]
+        for c in CLASSES:
+            big.append(c.toList())
+        roster1.update('A1', big)
 
-    destFolderId = '1a6nPndI_uVMxW75Ub5PmGNAaQQOcO7X5'  # Please set the destination folder ID.
-    num_unfixable = 0
-    for c in CLASSES:
-        if not c.fixable:
-            num_unfixable += 1
-    title = "Scheduling Results: alpha=" + str(alpha) + ", cost = " + str(totalCost()) + ", " + str(num_unfixable) + " unfixable classes" # Please set the Spreadsheet name.
-    if alpha > 1 or alpha < 0:
-        title = "Scheduling Results: stack-based, cost = " + str(totalCost()) + ", " + str(num_unfixable) + " unfixable classes"
-
-    drive_service = discovery.build('drive', 'v3', credentials=creds)  # Use "credentials" of "gspread.authorize(credentials)".
-    file_metadata = {
-        'name': title,
-        'mimeType': 'application/vnd.google-apps.spreadsheet',
-        'parents': [destFolderId]
-    }
-    file = drive_service.files().create(body=file_metadata).execute()
-
-    client = gspread.authorize(creds)
-
-    roster1 = client.open(title).add_worksheet("course_rosters", 1000,1000) #file.add_worksheet("course_rosters")  #
-    big = [["course", "faculty", "size / max", "cost", "fixable?", "students"]]
-    sortedClasses = sorted(CLASSES, key= Course.cost , reverse=True)
-    for c in sortedClasses:
-        big.append(c.toList())
-    roster1.update('A1', big)
-
-    roster2 = client.open(title).add_worksheet("students_COST",1000,1000)
-    big2 = []
-    big2.append(["Name", "Course Assigned", "Cost", "Total Cost"])
-    sortedStudents = sorted(STUDENTS, key= Student.cost , reverse=True)
-    x = 0
-    for s in sortedStudents:
-        if x == 0:
-            big2.append(s.toList().append(totalCost()))
-        else:
+        roster2 = client.open("Spring Intensive Signup (Responses)").get_worksheet(3)
+        big2 = []
+        big2.append(["Name", "Course Assigned", "Cost"])
+        sortedStudents = sorted(STUDENTS, key= Student.cost , reverse=True)
+        for s in sortedStudents:
             big2.append(s.toList())
-        x += 1
-    big2.append(["YO", "TEST"])
-    roster2.update('A1', big2)
 
-    roster3 = client.open(title).add_worksheet("veracross_data",1000,1000)
-    big3 = []
-    big3.append(["veracross_class_id", "class_id", "school_year",
-                 "veracross_student_id", "enrollment_level_id"])
-    for s in STUDENTS:
-        big3.append([s.course.id, s.course.name, "2021-22", s.email, s.form])
-    roster3.update('A1', big3)
+        roster2.update('A1', big2)
 
-    client.open(title).del_worksheet(client.open(title).worksheet("Sheet1"))
+        roster3 = client.open("Spring Intensive Signup (Responses)").get_worksheet(4)
+        big3 = []
+        big3.append(["veracross_class_id", "class_id", "school_year",
+                     "veracross_student_id", "enrollment_level_id"])
+        for s in STUDENTS:
+            big3.append([s.course.id, s.course.name, "2021-22", s.email, s.form])
+        roster3.update('A1', big3)
+
+
+
+
 
 
 # Debugging method, shows Classes and Students
@@ -482,21 +390,11 @@ def print_analytics():
 
 
 def main():
-    get_alphas()
-    # For the real implementation, we need a command line argument "real" in order to confirm
-    real = False
-    if sys.argv[1] == "real":
-        real = True
-        print("This is the real deal.")
-    for a in ALPHAS:
-        process_data(real)
-        assign(a)
-        courses_to_csv()
-        courses_to_spreadsheet(a)
-        debug_print_vars()
-        print_analytics()
-        CLASSES.clear()
-        STUDENTS.clear()
-
+    process_data()
+    assign()
+    courses_to_csv()
+    courses_to_spreadsheet()
+    debug_print_vars()
+    print_analytics()
 
 main()
